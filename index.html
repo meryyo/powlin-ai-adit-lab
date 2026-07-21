@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Powlin · Diagnóstico Web (Lab)</title>
+<style>
+  :root {
+    --green: #4a7c2f;
+    --green-light: #f1f7ec;
+    --orange: #d98c1f;
+    --orange-light: #fdf3e2;
+    --red: #c0392b;
+    --red-light: #fbeae7;
+    --ink: #2c2c2c;
+    --muted: #6b6b6b;
+    --border: #e3e3e3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #fafaf7;
+    color: var(--ink);
+    margin: 0;
+    padding: 32px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 24px; }
+
+  .form-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .form-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .field { flex: 1; min-width: 220px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--muted); }
+  input, select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 14px;
+  }
+  button {
+    background: var(--green); color: white; border: none; padding: 12px 24px;
+    border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .status { margin-top: 12px; font-size: 14px; color: var(--muted); }
+
+  .scores { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .score-card { flex: 1; min-width: 220px; border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+  .score-card.hotel { background: var(--green-light); border-color: #cfe3bd; }
+  .score-num { font-size: 40px; font-weight: 700; }
+  .score-label { font-size: 12px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  .summary-card {
+    background: white; border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 24px; line-height: 1.6;
+  }
+
+  .prechecks { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+  .precheck { flex: 1; min-width: 150px; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .precheck .label { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .precheck .value { font-weight: 600; margin-top: 4px; }
+  .ok { color: var(--green); }
+  .bad { color: var(--red); }
+
+  .modules { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .module-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
+  .module-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .module-title { font-weight: 600; }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 700; text-transform: uppercase; }
+  .badge.bien { background: var(--green-light); color: var(--green); }
+  .badge.mejorable { background: var(--orange-light); color: var(--orange); }
+  .badge.critico { background: var(--red-light); color: var(--red); }
+  .badge.not_found { background: #eee; color: var(--muted); }
+  .badge.manual_review { background: #eef2fb; color: #3b5bdb; }
+  .badge.error { background: var(--red-light); color: var(--red); }
+  .badge.incomplete_review { background: var(--orange-light); color: var(--orange); }
+
+  .warning-banner {
+    background: var(--red-light); border: 1px solid #f0c4bc; border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 24px; font-size: 14px; line-height: 1.5;
+  }
+  .warning-banner b { color: var(--red); }
+  .warning-banner ul { margin: 8px 0 0; padding-left: 18px; }
+  .module-error {
+    background: var(--red-light); border-radius: 8px; padding: 10px 14px;
+    font-size: 13px; color: var(--red); margin-top: 8px;
+  }
+  .diagnosis-degraded {
+    font-size: 12px; color: var(--orange); font-style: italic; margin-top: 4px;
+  }
+
+  .problem { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+  .problem h4 { margin: 0 0 6px; font-size: 14px; }
+  .problem .block-label { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-top: 10px; }
+  .problem p { margin: 4px 0 10px; font-size: 14px; line-height: 1.5; }
+  .problem .improved { background: var(--green-light); padding: 10px; border-radius: 8px; font-style: italic; }
+  .problem .action { background: var(--orange-light); padding: 10px; border-radius: 8px; }
+  .problem ul { margin: 4px 0; padding-left: 18px; font-size: 14px; }
+
+  /* Vista compacta — círculos de progreso por módulo */
+  .circle-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .circle-item {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    cursor: pointer; background: white; border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 8px; transition: transform 0.1s ease;
+  }
+  .circle-item:hover { transform: translateY(-2px); border-color: #ccc; }
+  .circle-item svg { transform: rotate(-90deg); }
+  .circle-item .circle-track { fill: none; stroke: #ececec; stroke-width: 8; }
+  .circle-item .circle-progress { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+  .circle-item .circle-center-wrap { position: relative; width: 88px; height: 88px; }
+  .circle-item .circle-score {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700;
+  }
+  .circle-item .circle-label { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.3; }
+  .circle-item .circle-sub { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+
+  .module-card .problems-detail { display: none; }
+  .module-card.expanded .problems-detail { display: block; }
+  .toggle-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  #resultArea { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🦉 Powlin — Diagnóstico Web (Lab)</h1>
+  <div class="subtitle">Prototipo interno · no producción · llama al Worker de Cloudflare</div>
+
+  <div class="form-card">
+    <div class="form-row">
+      <div class="field">
+        <label>Nombre del hotel</label>
+        <input id="hotelName" placeholder="Abama Hotels" />
+      </div>
+      <div class="field">
+        <label>URL del hotel</label>
+        <input id="hotelUrl" placeholder="https://www.abamahotels.com" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>URL del competidor (opcional)</label>
+        <input id="competitorUrl" placeholder="https://www.ritzcarlton.com/..." />
+      </div>
+      <div class="field">
+        <label>Idioma a auditar</label>
+        <select id="language">
+          <option value="es">Español</option>
+          <option value="en">Inglés</option>
+          <option value="de">Alemán</option>
+        </select>
+      </div>
+    </div>
+    <button id="runBtn" onclick="runAudit()">Ejecutar diagnóstico</button>
+    <div class="status" id="statusText"></div>
+  </div>
+
+  <div id="resultArea">
+    <div id="incompleteWarning"></div>
+
+    <div class="scores">
+      <div class="score-card hotel">
+        <div class="score-label">Tu web</div>
+        <div class="score-num" id="scoreHotel">-</div>
+      </div>
+      <div class="score-card" id="competitorCard" style="display:none;">
+        <div class="score-label">Tu competidor</div>
+        <div class="score-num" id="scoreCompetitor">-</div>
+        <div id="competitorDelta" style="font-size:13px; margin-top:4px; font-weight:600;"></div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">Estado</div>
+        <div id="statusSummary" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div class="summary-card" id="executiveSummary"></div>
+
+    <div class="prechecks" id="prechecksArea"></div>
+
+    <h3>Resumen por módulo</h3>
+    <div class="circle-grid" id="circleGrid"></div>
+
+    <h3>Detalle completo</h3>
+    <div class="modules" id="modulesArea"></div>
+  </div>
+</div>
+
+<script>
+  // Cambia esto por la URL real de tu Worker de Cloudflare una vez
+  // desplegado. Este archivo puede vivir en tu GitHub Pages tal cual
+  // — el Worker acepta peticiones desde cualquier origen.
+  const WORKER_URL = "https://powlin-ai-audit-lab.corpasmaria.workers.dev/api/audit";
+
+  // Traducción de los nombres técnicos de módulo (los mismos que usa el
+  // Worker y Notion) a nombres que un hotelero entiende sin explicación.
+  const MODULE_LABELS = {
+    HOME: "Primera impresión",
+    ROOMS: "Habitaciones",
+    FAQS: "Preguntas frecuentes",
+    LOCATION: "Ubicación y entorno",
+    GEO_TRANSVERSAL: "Visibilidad en IA",
+    VERIFIED_FACTS_PROFILE: "Confianza de los datos",
+    COMPARISON: "Comparativa con la competencia",
+    FOR_WHOM: "Para qué tipo de viajero",
+    EXPERIENCES: "Servicios y experiencias",
+    CONTACT: "Contacto",
+    MULTILINGUAL: "Idiomas",
+    AUTHORITY: "Autoridad externa",
+  };
+
+  const STATUS_COLORS = {
+    bien: "#4a7c2f",
+    mejorable: "#d98c1f",
+    critico: "#c0392b",
+    not_found: "#999",
+    error: "#c0392b",
+    incomplete_review: "#d98c1f",
+    manual_review: "#3b5bdb",
+  };
+
+  async function runAudit() {
+    const hotelName = document.getElementById("hotelName").value.trim();
+    const hotelUrl = document.getElementById("hotelUrl").value.trim();
+    const competitorUrl = document.getElementById("competitorUrl").value.trim();
+    const language = document.getElementById("language").value;
+
+    if (!hotelName || !hotelUrl) {
+      alert("Falta nombre del hotel o URL");
+      return;
+    }
+
+    const btn = document.getElementById("runBtn");
+    const statusText = document.getElementById("statusText");
+    btn.disabled = true;
+    statusText.textContent = "Ejecutando pipeline: prechecks → scraping → checklist → diagnóstico → score. Puede tardar 30-90s...";
+
+    try {
+      const res = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hotelName, hotelUrl, competitorUrl, language }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      render(data);
+      statusText.textContent = "Diagnóstico completo.";
+    } catch (err) {
+      statusText.textContent = "Error: " + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function render(data) {
+    document.getElementById("resultArea").style.display = "block";
+    document.getElementById("scoreHotel").textContent = (data.score_accommodation ?? "-") + "/10";
+    document.getElementById("executiveSummary").textContent = data.executive_summary || "(sin resumen)";
+
+    const competitorCard = document.getElementById("competitorCard");
+    if (data.score_competitor !== null && data.score_competitor !== undefined) {
+      competitorCard.style.display = "";
+      document.getElementById("scoreCompetitor").textContent = data.score_competitor + "/10";
+      const delta = Math.round((data.score_accommodation - data.score_competitor) * 10) / 10;
+      const deltaEl = document.getElementById("competitorDelta");
+      if (delta > 0) {
+        deltaEl.style.color = "var(--green)";
+        deltaEl.textContent = `▲ vas ${delta} puntos por delante`;
+      } else if (delta < 0) {
+        deltaEl.style.color = "var(--red)";
+        deltaEl.textContent = `▼ vas ${Math.abs(delta)} puntos por detrás`;
+      } else {
+        deltaEl.style.color = "var(--muted)";
+        deltaEl.textContent = "= mismo nivel";
+      }
+    } else {
+      competitorCard.style.display = "none";
+    }
+
+    const warningEl = document.getElementById("incompleteWarning");
+    if (data.audit_complete === false) {
+      const items = (data.modules_with_issues || [])
+        .map((m) => `<li><b>${m.module}</b> (${m.status}): ${m.reason || "sin detalle"}</li>`)
+        .join("");
+      warningEl.innerHTML = `<div class="warning-banner">
+        ⚠️ <b>Esta auditoría NO está completa.</b> ${data.modules_with_issues.length} módulo(s) no se
+        pudieron revisar correctamente incluso tras reintentar. El score de arriba NO incluye estos
+        módulos — no asumas que están "bien" solo porque no aparecen como críticos.
+        <ul>${items}</ul>
+      </div>`;
+    } else {
+      warningEl.innerHTML = "";
+    }
+
+    const critical = data.modules.filter((m) => m.status === "critico").length;
+    const improvable = data.modules.filter((m) => m.status === "mejorable").length;
+    const failed = data.modules.filter((m) => m.status === "error" || m.status === "incomplete_review").length;
+    document.getElementById("statusSummary").innerHTML =
+      `<div><b>${critical}</b> áreas críticas</div><div><b>${improvable}</b> áreas mejorables</div>` +
+      (failed ? `<div style="color:var(--red)"><b>${failed}</b> no revisadas correctamente</div>` : "");
+
+    const pre = data.prechecks || {};
+    const preArea = document.getElementById("prechecksArea");
+    preArea.innerHTML = "";
+    for (const [key, val] of Object.entries(pre)) {
+      const good = val.status === "ok";
+      preArea.innerHTML += `<div class="precheck">
+        <div class="label">${key.replace("_", " ")}</div>
+        <div class="value ${good ? "ok" : "bad"}">${val.status}</div>
+      </div>`;
+    }
+
+    renderCircles(data.modules, data.modules_competitor);
+
+    const modArea = document.getElementById("modulesArea");
+    modArea.innerHTML = "";
+    for (const m of data.modules) {
+      let problemsHtml = "";
+      for (const p of m.problems || []) {
+        const degraded = p.diagnosis_generation_failed
+          ? `<div class="diagnosis-degraded">⚠️ El diagnóstico detallado de este problema no se pudo generar tras varios intentos — el problema en sí sí está confirmado por el checklist.</div>`
+          : "";
+        problemsHtml += `
+          <div class="problem">
+            <h4>${p.problem_id} · <span style="color:var(--muted); font-weight:400;">${p.geo_impact || ""}</span></h4>
+            <p>${p.analysis || ""}</p>
+            ${degraded}
+            ${p.current_text ? `<div class="block-label">Texto actual</div><p>${p.current_text}</p>` : ""}
+            ${p.improved_text ? `<div class="block-label">Propuesta de mejora</div><div class="improved">${p.improved_text}</div>` : ""}
+            ${p.searches_losing ? `<div class="block-label">Búsquedas que estás perdiendo</div><p>${p.searches_losing}</p>` : ""}
+            ${p.action_this_week ? `<div class="block-label">Acción esta semana</div><div class="action">${p.action_this_week}</div>` : ""}
+            ${(p.implementation_checklist || []).length ? `<div class="block-label">Checklist de implementación</div><ul>${p.implementation_checklist.map((s) => `<li>${s}</li>`).join("")}</ul>` : ""}
+          </div>`;
+      }
+
+      const errorHtml = m.error ? `<div class="module-error">${m.error}</div>` : "";
+      const incompleteHtml = m.incomplete_review
+        ? `<div class="module-error">⚠️ Revisión incompleta: no se pudieron evaluar todos los criterios de este módulo tras reintentar. El score de este módulo no cuenta en el total.</div>`
+        : "";
+      const scoreLabel = m.score !== null ? `· ${m.score}` : "";
+      const coverageLabel = m.total_criteria ? ` (${m.total_checks || 0}/${m.total_criteria} criterios revisados)` : "";
+      const displayName = MODULE_LABELS[m.module_name] || m.module_name;
+      const cardId = `card-${m.module_id}`;
+
+      modArea.innerHTML += `
+        <div class="module-card" id="${cardId}">
+          <div class="module-head" onclick="toggleCard('${cardId}')">
+            <div>
+              <div class="module-title">${displayName}${coverageLabel}</div>
+              <div class="toggle-hint">Clic para ${(m.problems || []).length ? "ver el detalle" : "más info"}</div>
+            </div>
+            <span class="badge ${m.status}">${m.status.replace(/_/g, " ")} ${scoreLabel}</span>
+          </div>
+          <div class="problems-detail">
+            ${errorHtml}
+            ${incompleteHtml}
+            ${problemsHtml}
+          </div>
+        </div>`;
+    }
+  }
+
+  function toggleCard(cardId) {
+    document.getElementById(cardId).classList.toggle("expanded");
+  }
+
+  function renderCircles(modules, competitorModules) {
+    const grid = document.getElementById("circleGrid");
+    grid.innerHTML = "";
+    const radius = 36;
+    const outerRadius = 44;
+    const circumference = 2 * Math.PI * radius;
+    const outerCircumference = 2 * Math.PI * outerRadius;
+
+    for (const m of modules) {
+      const displayName = MODULE_LABELS[m.module_name] || m.module_name;
+      const color = STATUS_COLORS[m.status] || "#999";
+      const pct = m.score !== null ? Math.max(0, Math.min(100, m.score * 10)) : 0;
+      const offset = circumference - (pct / 100) * circumference;
+      const centerLabel = m.score !== null ? m.score : (m.status === "not_found" ? "—" : "?");
+
+      const compModule = competitorModules ? competitorModules.find((c) => c.module_id === m.module_id) : null;
+      let competitorRing = "";
+      let competitorSub = "";
+      if (compModule && compModule.score !== null) {
+        const compPct = Math.max(0, Math.min(100, compModule.score * 10));
+        const compOffset = outerCircumference - (compPct / 100) * outerCircumference;
+        competitorRing = `
+          <circle class="circle-track" cx="44" cy="44" r="${outerRadius}" stroke-width="4" />
+          <circle cx="44" cy="44" r="${outerRadius}" fill="none" stroke="#999" stroke-width="4"
+            stroke-linecap="round" stroke-dasharray="${outerCircumference}" stroke-dashoffset="${compOffset}" />`;
+        competitorSub = `<div class="circle-sub">vs competidor: ${compModule.score}</div>`;
+      }
+
+      const el = document.createElement("div");
+      el.className = "circle-item";
+      el.onclick = () => {
+        const card = document.getElementById(`card-${m.module_id}`);
+        if (card) {
+          card.classList.add("expanded");
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      };
+      el.innerHTML = `
+        <div class="circle-center-wrap">
+          <svg width="96" height="96" viewBox="0 0 88 88">
+            ${competitorRing}
+            <circle class="circle-track" cx="44" cy="44" r="${radius}" />
+            <circle class="circle-progress" cx="44" cy="44" r="${radius}"
+              stroke="${color}"
+              stroke-dasharray="${circumference}"
+              stroke-dashoffset="${offset}" />
+          </svg>
+          <div class="circle-score" style="color:${color}">${centerLabel}</div>
+        </div>
+        <div class="circle-label">${displayName}</div>
+        <div class="circle-sub">${m.status.replace(/_/g, " ")}</div>
+        ${competitorSub}
+      `;
+      grid.appendChild(el);
+    }
+
+    if (competitorModules) {
+      const legend = document.createElement("div");
+      legend.style.cssText = "grid-column:1/-1; font-size:12px; color:var(--muted); margin-top:-4px;";
+      legend.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${STATUS_COLORS.bien};margin-right:4px;"></span>Anillo interior = tu web &nbsp;&nbsp;
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#999;margin-right:4px;"></span>Anillo exterior gris = tu competidor`;
+      grid.appendChild(legend);
+    }
+  }
+</script>
+</body>
+</html>
