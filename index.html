@@ -81,6 +81,7 @@
   .badge.manual_review { background: #eef2fb; color: #3b5bdb; }
   .badge.error { background: var(--red-light); color: var(--red); }
   .badge.incomplete_review { background: var(--orange-light); color: var(--orange); }
+  .badge.not_evaluated_free_tier { background: #eee; color: var(--muted); }
 
   .warning-banner {
     background: var(--red-light); border: 1px solid #f0c4bc; border-radius: 12px;
@@ -259,6 +260,7 @@
     error: "#c0392b",
     incomplete_review: "#d98c1f",
     manual_review: "#3b5bdb",
+    not_evaluated_free_tier: "#999",
   };
 
   async function runAudit() {
@@ -320,19 +322,26 @@
     }
 
     const warningEl = document.getElementById("incompleteWarning");
-    if (data.audit_complete === false) {
-      const items = (data.modules_with_issues || [])
+    let warningHtml = "";
+    if ((data.modules_with_issues || []).length) {
+      const items = data.modules_with_issues
         .map((m) => `<li><b>${m.module}</b> (${m.status}): ${m.reason || "sin detalle"}</li>`)
         .join("");
-      warningEl.innerHTML = `<div class="warning-banner">
+      warningHtml += `<div class="warning-banner">
         ⚠️ <b>Esta auditoría NO está completa.</b> ${data.modules_with_issues.length} módulo(s) no se
         pudieron revisar correctamente incluso tras reintentar. El score de arriba NO incluye estos
         módulos — no asumas que están "bien" solo porque no aparecen como críticos.
         <ul>${items}</ul>
       </div>`;
-    } else {
-      warningEl.innerHTML = "";
     }
+    if ((data.modules_skipped_free_tier || []).length) {
+      warningHtml += `<div class="warning-banner" style="background:#f3f3f0; border-color:#ddd; color:var(--muted);">
+        ℹ️ <b>${data.modules_skipped_free_tier.length} módulo(s) no se evaluaron en esta pasada</b>
+        (plan gratuito de Cloudflare, límite de 50 llamadas por auditoría): ${data.modules_skipped_free_tier.join(", ")}.
+        Siguen disponibles en el Knowledge Base — aparecen abajo marcados como "no evaluado". Al pasar al plan Paid ($5/mes) se evalúan todos.
+      </div>`;
+    }
+    warningEl.innerHTML = warningHtml;
 
     const critical = data.modules.filter((m) => m.status === "critico").length;
     const improvable = data.modules.filter((m) => m.status === "mejorable").length;
